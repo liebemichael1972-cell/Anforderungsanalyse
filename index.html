@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anforderungsanalyse – Requirements Editor</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">📋</span>
+      <div>
+        <h1>Anforderungsanalyse</h1>
+        <p class="subtitle">Fachliche &amp; nicht-fachliche Anforderungen sowie Abnahmekriterien erfassen</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="saveState" class="save-state">Automatisch gespeichert</span>
+      <button id="btnImport" class="btn btn-ghost" title="Projekt aus JSON laden">Importieren</button>
+      <button id="btnExportJson" class="btn btn-ghost" title="Projekt als JSON sichern">JSON sichern</button>
+      <button id="btnReset" class="btn btn-ghost btn-danger" title="Alles zurücksetzen">Zurücksetzen</button>
+      <input type="file" id="fileImport" accept="application/json,.json" hidden />
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Left: Editor -->
+    <section class="editor" aria-label="Editor">
+
+      <!-- Projekt -->
+      <div class="card">
+        <h2 class="card-title">Projekt</h2>
+        <div class="grid-2">
+          <label class="field">
+            <span>Projekttitel</span>
+            <input type="text" id="projTitle" placeholder="z. B. Kundenportal Neubau" />
+          </label>
+          <label class="field">
+            <span>Autor / Ansprechpartner</span>
+            <input type="text" id="projAuthor" placeholder="z. B. Michael" />
+          </label>
+        </div>
+        <label class="field">
+          <span>Zielsetzung / Kontext</span>
+          <textarea id="projDesc" rows="3" placeholder="Worum geht es? Welches Problem wird gelöst? Für wen?"></textarea>
+        </label>
+        <div class="grid-2">
+          <label class="field">
+            <span>Rahmenbedingungen / Technologie-Vorgaben</span>
+            <textarea id="projTech" rows="2" placeholder="z. B. React, PostgreSQL, muss on-prem laufen"></textarea>
+          </label>
+          <label class="field">
+            <span>Out of Scope (nicht Teil des Projekts)</span>
+            <textarea id="projScope" rows="2" placeholder="Was ausdrücklich NICHT umgesetzt wird"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <!-- Fachliche Anforderungen -->
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Fachliche Anforderungen <span class="counter" id="cntFunctional">0</span></h2>
+          <button class="btn btn-primary" data-add="functional">+ Anforderung</button>
+        </div>
+        <p class="card-hint">Funktionale Anforderungen: Was soll das System fachlich können?</p>
+        <div id="listFunctional" class="req-list"></div>
+        <div class="empty" id="emptyFunctional">Noch keine fachlichen Anforderungen erfasst.</div>
+      </div>
+
+      <!-- Nicht-fachliche Anforderungen -->
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Nicht-fachliche Anforderungen <span class="counter" id="cntNonFunctional">0</span></h2>
+          <button class="btn btn-primary" data-add="nonfunctional">+ Anforderung</button>
+        </div>
+        <p class="card-hint">Nicht-funktionale Anforderungen: Qualität wie Performance, Sicherheit, Usability, Betrieb.</p>
+        <div id="listNonFunctional" class="req-list"></div>
+        <div class="empty" id="emptyNonFunctional">Noch keine nicht-fachlichen Anforderungen erfasst.</div>
+      </div>
+
+      <!-- Abnahmekriterien -->
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Abnahmekriterien <span class="counter" id="cntAcceptance">0</span></h2>
+          <button class="btn btn-primary" data-add="acceptance">+ Kriterium</button>
+        </div>
+        <p class="card-hint">Wann gilt eine Anforderung als erfüllt? Optional im Gegeben/Wenn/Dann-Format.</p>
+        <div id="listAcceptance" class="req-list"></div>
+        <div class="empty" id="emptyAcceptance">Noch keine Abnahmekriterien erfasst.</div>
+      </div>
+
+    </section>
+
+    <!-- Right: Markdown preview -->
+    <aside class="preview" aria-label="Markdown-Vorschau">
+      <div class="preview-head">
+        <h2 class="card-title">Markdown-Ergebnis</h2>
+        <div class="preview-actions">
+          <button id="btnCopy" class="btn btn-ghost">Kopieren</button>
+          <button id="btnDownload" class="btn btn-primary">Download .md</button>
+        </div>
+      </div>
+      <p class="card-hint">Diese Datei kann direkt an Claude Code übergeben werden, um die Umsetzung zu starten.</p>
+      <pre id="markdownOut" class="markdown-out"></pre>
+    </aside>
+  </main>
+
+  <!-- Template: Fachliche/nicht-fachliche Anforderung -->
+  <template id="tplRequirement">
+    <div class="req-item" data-id="">
+      <div class="req-item-head">
+        <span class="req-id"></span>
+        <input type="text" class="req-title" placeholder="Kurztitel der Anforderung" data-field="title" />
+        <button class="icon-btn btn-danger" data-action="delete" title="Löschen">✕</button>
+      </div>
+      <textarea class="req-desc" rows="2" placeholder="Beschreibung: Was genau soll umgesetzt werden?" data-field="description"></textarea>
+      <div class="req-meta">
+        <label class="inline-field">
+          <span>Priorität</span>
+          <select data-field="priority">
+            <option value="Muss">Muss</option>
+            <option value="Soll">Soll</option>
+            <option value="Kann">Kann</option>
+          </select>
+        </label>
+        <label class="inline-field category-field">
+          <span>Kategorie</span>
+          <select data-field="category"></select>
+        </label>
+      </div>
+    </div>
+  </template>
+
+  <!-- Template: Abnahmekriterium -->
+  <template id="tplAcceptance">
+    <div class="req-item" data-id="">
+      <div class="req-item-head">
+        <span class="req-id"></span>
+        <input type="text" class="req-title" placeholder="Titel des Abnahmekriteriums" data-field="title" />
+        <button class="icon-btn btn-danger" data-action="delete" title="Löschen">✕</button>
+      </div>
+      <label class="inline-field full">
+        <span>Bezieht sich auf</span>
+        <select data-field="relatedTo"></select>
+      </label>
+      <div class="gwt">
+        <label class="field"><span>Gegeben (Vorbedingung)</span>
+          <textarea rows="1" data-field="given" placeholder="z. B. Nutzer ist angemeldet"></textarea></label>
+        <label class="field"><span>Wenn (Aktion)</span>
+          <textarea rows="1" data-field="when" placeholder="z. B. klickt auf 'Bestellen'"></textarea></label>
+        <label class="field"><span>Dann (erwartetes Ergebnis)</span>
+          <textarea rows="1" data-field="then" placeholder="z. B. wird die Bestellung gespeichert"></textarea></label>
+      </div>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
