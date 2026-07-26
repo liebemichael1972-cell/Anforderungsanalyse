@@ -379,28 +379,59 @@
       .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "anforderungen";
   }
 
-  // Eingebettete Ansichten (iframe/Sandbox) blockieren Downloads im Browser.
-  function downloadsBlocked() {
+  // Läuft die Anwendung eingebettet (iframe)? Dort können Browser Downloads sperren.
+  function isEmbedded() {
     try { return window.self !== window.top; } catch (e) { return true; }
   }
 
-  // Versucht einen echten Datei-Download. Ist das nicht möglich, wird der Inhalt
-  // in einem Dialog zum Kopieren angezeigt. Gibt zurück, ob der Download lief.
+  // Löst den Datei-Download aus. Der Download wird immer angestoßen; die
+  // Kopier-Möglichkeit wird nur zusätzlich angeboten, falls der Browser ihn sperrt.
   function downloadBlob(content, filename, mime) {
-    if (downloadsBlocked()) { showTextFallback(content, filename); return false; }
-    try {
-      const blob = new Blob([content], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename; a.rel = "noopener";
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      return true;
-    } catch (e) {
-      showTextFallback(content, filename);
-      return false;
-    }
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Eingebettete Ansichten können Downloads sperren – dort zusätzlich einen
+    // Ausweg anbieten, ohne den regulären Download zu behindern.
+    if (isEmbedded()) offerCopyFallback(content, filename, url);
+
+
+    // URL erst spät freigeben, damit langsame Downloads nicht abbrechen.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return true;
+  }
+
+  // Unaufdringlicher Hinweis: Falls der Download nicht ankam, Inhalt kopieren.
+  function offerCopyFallback(content, filename, url) {
+    let bar = document.querySelector(".fallback-bar");
+    if (bar) bar.remove();
+    bar = document.createElement("div");
+    bar.className = "fallback-bar";
+    bar.innerHTML = `<span>Download gestartet. Nichts angekommen?</span>
+      <button class="btn" data-tab>In neuem Tab öffnen</button>
+      <button class="btn btn-primary" data-open>Inhalt kopieren</button>
+      <button class="icon-btn" data-close aria-label="Hinweis schließen">✕</button>`;
+    document.body.appendChild(bar);
+    requestAnimationFrame(() => bar.classList.add("show"));
+
+    const close = () => bar.remove();
+    bar.querySelector("[data-close]").addEventListener("click", close);
+    // Öffnen aus einer Nutzeraktion heraus – das lassen Browser eher zu.
+    bar.querySelector("[data-tab]").addEventListener("click", () => {
+      window.open(url, "_blank", "noopener");
+    });
+    bar.querySelector("[data-open]").addEventListener("click", () => {
+      close(); showTextFallback(content, filename);
+    });
+    setTimeout(() => { if (bar.isConnected) bar.classList.remove("show"); }, 12000);
+    setTimeout(() => { if (bar.isConnected) bar.remove(); }, 12400);
   }
 
   function showTextFallback(content, filename) {
@@ -409,8 +440,7 @@
     overlay.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
         <h3 id="dlgTitle">Inhalt kopieren</h3>
-        <p class="modal-hint">Der Browser erlaubt hier keinen direkten Download.
-          Kopiere den Text und speichere ihn als <code></code>.</p>
+        <p class="modal-hint">Kopiere den Text und speichere ihn als <code></code>.</p>
         <textarea readonly spellcheck="false"></textarea>
         <div class="modal-actions">
           <button class="btn" data-close>Schließen</button>
@@ -453,8 +483,8 @@
     });
 
     document.getElementById("btnDownload").addEventListener("click", () => {
-      const ok = downloadBlob(md(), slugify(state.project.title) + "-anforderungen.md", "text/markdown;charset=utf-8");
-      if (ok) toast("Markdown-Datei heruntergeladen");
+      downloadBlob(md(), slugify(state.project.title) + "-anforderungen.md", "text/markdown;charset=utf-8");
+      toast("Markdown-Datei heruntergeladen");
     });
 
     document.getElementById("btnCopy").addEventListener("click", async () => {
@@ -473,8 +503,8 @@
     });
 
     document.getElementById("btnExportJson").addEventListener("click", () => {
-      const ok = downloadBlob(JSON.stringify(state, null, 2), slugify(state.project.title) + "-anforderungen.json", "application/json");
-      if (ok) toast("Projekt als JSON gesichert");
+      downloadBlob(JSON.stringify(state, null, 2), slugify(state.project.title) + "-anforderungen.json", "application/json");
+      toast("Projekt als JSON gesichert");
     });
 
     const fileInput = document.getElementById("fileImport");

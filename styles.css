@@ -228,3 +228,16 @@ select { cursor: pointer; }
   font-size: 12.5px; line-height: 1.6;
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
+
+/* Hinweisleiste, falls der Download vom Browser unterbunden wurde */
+.fallback-bar {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  box-shadow: var(--shadow); border-radius: 10px;
+  padding: 10px 12px 10px 16px; font-size: 13px;
+  z-index: 150; max-width: calc(100vw - 32px); flex-wrap: wrap;
+  opacity: 0; transition: opacity .25s, transform .25s;
+}
+.fallback-bar.show { opacity: 1; transform: translateX(-50%) translateY(0); }
