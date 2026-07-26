@@ -17,10 +17,12 @@
     </div>
     <div class="header-actions">
       <span id="saveState" class="save-state">Automatisch gespeichert</span>
-      <button id="btnImport" class="btn btn-ghost" title="Projekt aus JSON laden">Importieren</button>
+      <button id="btnImportMd" class="btn btn-ghost" title="Bestehende Markdown-Datei zum Weiterbearbeiten laden">Markdown laden</button>
+      <button id="btnImport" class="btn btn-ghost" title="Projekt aus JSON laden">JSON laden</button>
       <button id="btnExportJson" class="btn btn-ghost" title="Projekt als JSON sichern">JSON sichern</button>
       <button id="btnReset" class="btn btn-ghost btn-danger" title="Alles zurücksetzen">Zurücksetzen</button>
       <input type="file" id="fileImport" accept="application/json,.json" hidden />
+      <input type="file" id="fileImportMd" accept="text/markdown,.md,.markdown,.txt" hidden />
     </div>
   </header>
 

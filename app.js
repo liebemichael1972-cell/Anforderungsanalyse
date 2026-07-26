@@ -371,6 +371,132 @@
     document.getElementById("markdownOut").textContent = md();
   }
 
+  // ---------- Markdown einlesen ----------
+  // Liest eine zuvor erzeugte Markdown-Datei wieder ein, damit bestehende
+  // Anforderungen weiterbearbeitet werden können.
+  function parseMarkdown(text) {
+    const st = defaultState();
+    const lines = String(text).replace(/\r\n?/g, "\n").split("\n");
+    const relations = [];   // { item, ref } – Bezüge werden am Ende aufgelöst
+    let section = null;     // aktueller Abschnitt
+    let item = null;        // aktuelle Anforderung / aktuelles Kriterium
+    let buffer = [];        // Freitext des aktuellen Abschnitts
+
+    const FREETEXT = { desc: 1, tech: 1, scope: 1 };
+    const flushText = () => {
+      if (section && FREETEXT[section]) {
+        const t = buffer.join("\n").trim();
+        if (t) st.project[section] = t;
+      }
+      buffer = [];
+    };
+
+    const sectionOf = (heading) => {
+      const h = heading.toLowerCase();
+      if (h.includes("umsetzungsauftrag")) return null;
+      if (h.includes("übersicht") || h.includes("ubersicht")) return "desc";
+      if (h.includes("rahmenbedingung") || h.includes("technologie")) return "tech";
+      if (h.includes("out of scope")) return "scope";
+      if (h.includes("abnahmekriterien")) return "acceptance";
+      // Reihenfolge wichtig: "nicht-fachlich" vor "fachlich" prüfen
+      if (h.includes("nicht-fachlich") || h.includes("nicht fachlich") ||
+          h.includes("nicht-funktional") || h.includes("nicht funktional")) return "nonfunctional";
+      if (h.includes("fachlich") || h.includes("funktional")) return "functional";
+      return null;
+    };
+
+    const clean = (v) => {
+      const t = (v || "").trim();
+      return (t === "—" || t === "-" || t === "–") ? "" : t;
+    };
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+
+      // Projekttitel
+      const h1 = line.match(/^#\s+(.*)$/);
+      if (h1) { flushText(); section = null; item = null; st.project.title = clean(h1[1]); continue; }
+
+      // Abschnittswechsel
+      const h2 = line.match(/^##\s+(.*)$/);
+      if (h2) { flushText(); section = sectionOf(h2[1]); item = null; continue; }
+
+      // Neue Anforderung / neues Kriterium
+      const h3 = line.match(/^###\s+(.*)$/);
+      if (h3) {
+        item = null;
+        if (section === "functional" || section === "nonfunctional") {
+          item = { id: nextId(section), title: "", description: "", priority: "Muss" };
+          if (section === "nonfunctional") item.category = NFA_CATEGORIES[0];
+          st[section].push(item);
+        } else if (section === "acceptance") {
+          item = { id: nextId("acceptance"), title: "", relatedTo: "", given: "", when: "", then: "" };
+          st.acceptance.push(item);
+        }
+        if (item) {
+          // Führende Nummerierung (FA-1:, NFA-2:, AK-3:) entfernen
+          item.title = clean(h3[1].replace(/^(FA|NFA|AK)-\d+\s*:\s*/i, ""));
+        }
+        continue;
+      }
+
+      // Feldzeilen einer Anforderung
+      const bullet = line.match(/^\s*[-*]\s+\*\*(.+?):\*\*\s*(.*)$/);
+      if (bullet && item) {
+        const key = bullet[1].trim().toLowerCase();
+        const val = clean(bullet[2]);
+        if (key.startsWith("priorit")) {
+          item.priority = ["Muss", "Soll", "Kann"].includes(val) ? val : "Muss";
+        } else if (key.startsWith("beschreibung")) {
+          item.description = val;
+        } else if (key.startsWith("kategorie")) {
+          item.category = NFA_CATEGORIES.includes(val) ? val : "Sonstiges";
+        } else if (key.startsWith("bezug")) {
+          const ref = val.match(/^(FA|NFA)-(\d+)/i);
+          if (ref) relations.push({ item, type: ref[1].toUpperCase(), index: parseInt(ref[2], 10) - 1 });
+        } else if (key.startsWith("gegeben")) {
+          item.given = val;
+        } else if (key.startsWith("wenn")) {
+          item.when = val;
+        } else if (key.startsWith("dann")) {
+          item.then = val;
+        }
+        continue;
+      }
+
+      // Autorzeile aus dem Kopfbereich
+      const author = line.match(/^\*\*Autor:\*\*\s*(.*)$/i);
+      if (author) { st.project.author = clean(author[1]); continue; }
+      if (/^\*\*Datum:\*\*/i.test(line)) continue;
+
+      // Platzhalter und Trennlinien überspringen
+      if (/^_Keine .*erfasst\._$/.test(line.trim())) continue;
+      if (/^-{3,}$/.test(line.trim())) continue;
+
+      // Freitext der Beschreibungsabschnitte sammeln
+      if (section && FREETEXT[section] && !item) buffer.push(line);
+    }
+    flushText();
+
+    // Bezüge der Abnahmekriterien auflösen (FA-1 → tatsächliche ID)
+    relations.forEach(({ item, type, index }) => {
+      const list = type === "FA" ? st.functional : st.nonfunctional;
+      if (list[index]) item.relatedTo = list[index].id;
+    });
+
+    st.counters = {
+      functional: st.functional.length,
+      nonfunctional: st.nonfunctional.length,
+      acceptance: st.acceptance.length
+    };
+    return st;
+  }
+
+  function hasContent(s) {
+    return !!(s.project.title || s.project.desc || s.functional.length ||
+      s.nonfunctional.length || s.acceptance.length);
+  }
+
   // ---------- Aktionen: Download / Copy / Export / Import / Reset ----------
   function slugify(s) {
     return (s || "anforderungen").toLowerCase()
@@ -524,6 +650,34 @@
           toast("Ungültige JSON-Datei");
         }
         fileInput.value = "";
+      };
+      reader.readAsText(file);
+    });
+
+    const mdInput = document.getElementById("fileImportMd");
+    document.getElementById("btnImportMd").addEventListener("click", () => mdInput.click());
+    mdInput.addEventListener("change", () => {
+      const file = mdInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const parsed = parseMarkdown(reader.result);
+        if (!hasContent(parsed)) {
+          toast("Keine Anforderungen in der Datei erkannt");
+          mdInput.value = "";
+          return;
+        }
+        if (hasContent(state) &&
+            !confirm("Die aktuellen Eingaben werden durch den Inhalt der Datei ersetzt. Fortfahren?")) {
+          mdInput.value = "";
+          return;
+        }
+        state = parsed;
+        renderAll();
+        save();
+        toast(`Importiert: ${parsed.functional.length} fachliche, ` +
+          `${parsed.nonfunctional.length} nicht-fachliche, ${parsed.acceptance.length} Kriterien`);
+        mdInput.value = "";
       };
       reader.readAsText(file);
     });
