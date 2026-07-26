@@ -14,6 +14,8 @@ kann, um die Umsetzung zu starten.
 - **Abnahmekriterien** – optional im Gegeben/Wenn/Dann-Format, mit Zuordnung zu einer Anforderung
 - **Live-Markdown-Vorschau** rechts, jederzeit aktuell
 - **Download `.md`** und **Kopieren** in die Zwischenablage
+- **Markdown-Import** – eine zuvor erzeugte `.md`-Datei wieder einlesen und
+  die Anforderungen weiterbearbeiten (verlustfreier Rundlauf inkl. Bezüge)
 - **Automatisches Speichern** im Browser (LocalStorage) – nichts geht verloren
 - **JSON-Export/-Import** zum Sichern und Weitergeben des kompletten Projekts
 
@@ -32,6 +34,16 @@ Es wird **kein Server und keine Installation** benötigt – alles läuft lokal 
 > **Hinweis:** Wird die Anwendung in einer eingebetteten Vorschau (iframe) angezeigt,
 > blockiert der Browser Datei-Downloads. In diesem Fall öffnet sich automatisch ein
 > Dialog mit dem fertigen Markdown-Text samt **Alles kopieren**-Schaltfläche.
+
+## Bestehende Anforderungen weiterbearbeiten
+
+Über **Markdown laden** lässt sich eine früher erzeugte `.md`-Datei wieder
+einlesen. Erkannt werden Projektangaben, fachliche und nicht-fachliche
+Anforderungen samt Priorität und Kategorie sowie Abnahmekriterien inklusive
+ihres Bezugs zur jeweiligen Anforderung (`FA-1`, `NFA-2` …).
+
+Enthält die Datei keine erkennbaren Anforderungen, bleiben die aktuellen
+Eingaben unverändert; vor dem Überschreiben wird nachgefragt.
 
 ## Weitergabe an Claude Code
 
