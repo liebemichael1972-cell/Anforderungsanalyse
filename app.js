@@ -560,6 +560,42 @@
     setTimeout(() => { if (bar.isConnected) bar.remove(); }, 12400);
   }
 
+  // Eigener Bestätigungsdialog. Das eingebaute confirm() wird in eingebetteten
+  // Ansichten (iframe/Sandbox) blockiert und liefert dort immer "false".
+  function askConfirm(message, confirmLabel) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "overlay";
+      overlay.innerHTML = `
+        <div class="modal modal-confirm" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
+          <h3 id="cfTitle">Bitte bestätigen</h3>
+          <p class="confirm-text"></p>
+          <div class="modal-actions">
+            <button class="btn" data-cancel>Abbrechen</button>
+            <button class="btn btn-primary" data-ok></button>
+          </div>
+        </div>`;
+      overlay.querySelector(".confirm-text").textContent = message;
+      overlay.querySelector("[data-ok]").textContent = confirmLabel || "Bestätigen";
+      document.body.appendChild(overlay);
+
+      const done = (answer) => {
+        document.removeEventListener("keydown", onKey);
+        overlay.remove();
+        resolve(answer);
+      };
+      function onKey(e) {
+        if (e.key === "Escape") done(false);
+        if (e.key === "Enter") done(true);
+      }
+      overlay.querySelector("[data-cancel]").addEventListener("click", () => done(false));
+      overlay.querySelector("[data-ok]").addEventListener("click", () => done(true));
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) done(false); });
+      document.addEventListener("keydown", onKey);
+      overlay.querySelector("[data-ok]").focus();
+    });
+  }
+
   function showTextFallback(content, filename) {
     const overlay = document.createElement("div");
     overlay.className = "overlay";
@@ -660,17 +696,18 @@
       const file = mdInput.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         const parsed = parseMarkdown(reader.result);
         if (!hasContent(parsed)) {
           toast("Keine Anforderungen in der Datei erkannt");
           mdInput.value = "";
           return;
         }
-        if (hasContent(state) &&
-            !confirm("Die aktuellen Eingaben werden durch den Inhalt der Datei ersetzt. Fortfahren?")) {
-          mdInput.value = "";
-          return;
+        if (hasContent(state)) {
+          const ok = await askConfirm(
+            "Die aktuellen Eingaben werden durch den Inhalt der Datei ersetzt. Fortfahren?",
+            "Ersetzen");
+          if (!ok) { mdInput.value = ""; return; }
         }
         state = parsed;
         renderAll();
@@ -682,13 +719,15 @@
       reader.readAsText(file);
     });
 
-    document.getElementById("btnReset").addEventListener("click", () => {
-      if (confirm("Wirklich alle Eingaben zurücksetzen? Das kann nicht rückgängig gemacht werden.")) {
-        state = defaultState();
-        renderAll();
-        save();
-        toast("Zurückgesetzt");
-      }
+    document.getElementById("btnReset").addEventListener("click", async () => {
+      const ok = await askConfirm(
+        "Wirklich alle Eingaben zurücksetzen? Das kann nicht rückgängig gemacht werden.",
+        "Zurücksetzen");
+      if (!ok) return;
+      state = defaultState();
+      renderAll();
+      save();
+      toast("Zurückgesetzt");
     });
   }
 
