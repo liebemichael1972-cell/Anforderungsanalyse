@@ -130,6 +130,49 @@
           <span>Kategorie</span>
           <select data-field="category"></select>
         </label>
+        <label class="inline-field">
+          <span>Nachweis durch</span>
+          <select data-field="verification">
+            <option value="">– noch offen –</option>
+            <option value="Test">Test</option>
+            <option value="Analyse">Analyse</option>
+            <option value="Inspektion">Inspektion</option>
+            <option value="Demonstration">Demonstration</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid-2 req-extra">
+        <label class="field">
+          <span>Begründung – warum wird das gebraucht?</span>
+          <textarea rows="2" data-field="rationale" placeholder="z. B. gesetzliche Vorgabe, Kundenwunsch aus Workshop vom 12.03."></textarea>
+        </label>
+        <label class="field">
+          <span>Quelle / Anfordernder</span>
+          <input type="text" data-field="source" placeholder="z. B. Fachbereich Vertrieb, Frau Meier" />
+        </label>
+      </div>
+      <div class="metrics-field">
+        <p class="metrics-hint">Messbar machen: ohne Maßeinheit und Zielwert ist eine nicht-fachliche Anforderung nicht prüfbar.</p>
+        <div class="grid-2">
+          <label class="field">
+            <span>Messgröße</span>
+            <input type="text" data-field="metricScale" placeholder="z. B. Antwortzeit der Suche in ms, 95. Perzentil" />
+          </label>
+          <label class="field">
+            <span>Messverfahren</span>
+            <input type="text" data-field="metricMeter" placeholder="z. B. Lasttest mit 500 Nutzern in der Testumgebung" />
+          </label>
+        </div>
+        <div class="grid-2">
+          <label class="field">
+            <span>Muss-Wert (Mindestanforderung)</span>
+            <input type="text" data-field="metricMust" placeholder="z. B. unter 2000 ms" />
+          </label>
+          <label class="field">
+            <span>Ziel-Wert (angestrebt)</span>
+            <input type="text" data-field="metricPlan" placeholder="z. B. unter 800 ms" />
+          </label>
+        </div>
       </div>
     </div>
   </template>

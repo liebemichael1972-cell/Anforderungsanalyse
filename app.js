@@ -14,13 +14,20 @@
     "Betrieb / Deployment", "Sonstiges"
   ];
 
-  /** @typedef {{id:string,title:string,description:string,priority:string,category?:string}} Requirement */
+  // Nachweisarten nach ISO/IEC/IEEE 29148 bzw. INCOSE
+  const VERIFICATION_METHODS = ["Test", "Analyse", "Inspektion", "Demonstration"];
+
+  /**
+   * @typedef {{id:string,num:number,title:string,description:string,rationale:string,
+   *   source:string,verification:string,priority:string,category?:string,
+   *   metricScale?:string,metricMeter?:string,metricMust?:string,metricPlan?:string}} Requirement
+   */
 
   const defaultState = () => ({
     project: { title: "", author: "", desc: "", tech: "", scope: "" },
     functional: [],
     nonfunctional: [],
-    acceptance: [], // {id,title,relatedTo,given,when,then}
+    acceptance: [], // {id,num,title,relatedTo,given,when,then}
     counters: { functional: 0, nonfunctional: 0, acceptance: 0 }
   });
 
@@ -32,10 +39,38 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        return Object.assign(defaultState(), parsed);
+        return migrate(Object.assign(defaultState(), parsed));
       }
     } catch (e) { console.warn("Konnte gespeicherten Stand nicht laden", e); }
     return defaultState();
+  }
+
+  /**
+   * Ergänzt fehlende Felder älterer Stände. Vor allem: Anforderungen ohne
+   * gespeicherte Nummer erhalten eine, damit Bezeichner stabil bleiben.
+   */
+  function migrate(s) {
+    ["functional", "nonfunctional", "acceptance"].forEach(type => {
+      if (!Array.isArray(s[type])) s[type] = [];
+      let max = 0;
+      s[type].forEach((it, i) => {
+        if (typeof it.num !== "number" || it.num <= 0) it.num = i + 1;
+        if (it.num > max) max = it.num;
+        if (type !== "acceptance") {
+          if (typeof it.rationale !== "string") it.rationale = "";
+          if (typeof it.source !== "string") it.source = "";
+          if (typeof it.verification !== "string") it.verification = "";
+        }
+        if (type === "nonfunctional") {
+          ["metricScale", "metricMeter", "metricMust", "metricPlan"].forEach(k => {
+            if (typeof it[k] !== "string") it[k] = "";
+          });
+        }
+      });
+      s.counters = s.counters || {};
+      s.counters[type] = Math.max(s.counters[type] || 0, max);
+    });
+    return s;
   }
 
   let saveTimer = null;
@@ -57,15 +92,22 @@
 
   // ---------- Hilfsfunktionen ----------
   const $ = (sel, root = document) => root.querySelector(sel);
-  const nextId = (type) => "r" + type + "_" + (++state.counters[type]) + "_" + Date.now().toString(36);
+  const newId = () => "r_" + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+
+  // Vergibt die nächste freie Nummer. Nummern werden nie erneut vergeben,
+  // damit Verweise auf FA-3 dauerhaft dieselbe Anforderung meinen.
+  function nextNum(type) {
+    state.counters[type] = (state.counters[type] || 0) + 1;
+    return state.counters[type];
+  }
 
   function prefixFor(type) {
     return type === "functional" ? "FA" : type === "nonfunctional" ? "NFA" : "AK";
   }
 
-  // Fortlaufende Anzeige-Nummer (FA-1, FA-2 …) basierend auf Reihenfolge
-  function displayId(type, index) {
-    return prefixFor(type) + "-" + (index + 1);
+  // Stabiler Bezeichner (FA-1, NFA-2 …) aus der gespeicherten Nummer
+  function displayId(type, item) {
+    return prefixFor(type) + "-" + item.num;
   }
 
   // ---------- Rendering: Projekt ----------
@@ -100,7 +142,7 @@
   function buildRequirementNode(type, item, index) {
     const node = document.getElementById("tplRequirement").content.firstElementChild.cloneNode(true);
     node.dataset.id = item.id;
-    $(".req-id", node).textContent = displayId(type, index);
+    $(".req-id", node).textContent = displayId(type, item);
 
     const titleEl = $(".req-title", node);
     const descEl = $(".req-desc", node);
@@ -120,6 +162,7 @@
         catEl.appendChild(opt);
       });
       catEl.value = item.category || NFA_CATEGORIES[0];
+      $(".metrics-field", node).classList.add("show");
     }
 
     // Events
@@ -129,6 +172,20 @@
     if (type === "nonfunctional") {
       catEl.addEventListener("change", () => { item.category = catEl.value; save(); renderMarkdown(); });
     }
+
+    // Begründung, Quelle, Nachweisart und (bei NFA) die Messwerte
+    const textFields = ["rationale", "source", "verification"];
+    if (type === "nonfunctional") {
+      textFields.push("metricScale", "metricMeter", "metricMust", "metricPlan");
+    }
+    textFields.forEach(field => {
+      const el = $(`[data-field="${field}"]`, node);
+      if (!el) return;
+      el.value = item[field] || "";
+      const evt = el.tagName === "SELECT" ? "change" : "input";
+      el.addEventListener(evt, () => { item[field] = el.value; save(); renderMarkdown(); });
+    });
+
     $('[data-action="delete"]', node).addEventListener("click", () => {
       state[type] = state[type].filter(x => x.id !== item.id);
       renderRequirementList(type);
@@ -159,7 +216,7 @@
       if (state[g.type].length === 0) return;
       html += `<optgroup label="${escapeHtml(g.label)}">`;
       state[g.type].forEach((r, i) => {
-        const id = displayId(g.type, i);
+        const id = displayId(g.type, r);
         const label = id + (r.title ? " – " + r.title : "");
         const sel = selected === r.id ? " selected" : "";
         html += `<option value="${r.id}"${sel}>${escapeHtml(label)}</option>`;
@@ -172,7 +229,7 @@
   function buildAcceptanceNode(item, index) {
     const node = document.getElementById("tplAcceptance").content.firstElementChild.cloneNode(true);
     node.dataset.id = item.id;
-    $(".req-id", node).textContent = displayId("acceptance", index);
+    $(".req-id", node).textContent = displayId("acceptance", item);
 
     const titleEl = $(".req-title", node);
     const relEl = $('[data-field="relatedTo"]', node);
@@ -224,15 +281,20 @@
   // ---------- Hinzufügen ----------
   function addRequirement(type) {
     if (type === "acceptance") {
-      state.acceptance.push({ id: nextId("acceptance"), title: "", relatedTo: "", given: "", when: "", then: "" });
+      state.acceptance.push({ id: newId(), num: nextNum("acceptance"), title: "", relatedTo: "", given: "", when: "", then: "" });
       renderAcceptanceList();
       // Fokus auf neues Feld
       const nodes = document.querySelectorAll("#listAcceptance .req-item");
       const last = nodes[nodes.length - 1];
       if (last) $(".req-title", last).focus();
     } else {
-      const item = { id: nextId(type), title: "", description: "", priority: "Muss" };
-      if (type === "nonfunctional") item.category = NFA_CATEGORIES[0];
+      const item = { id: newId(), num: nextNum(type), title: "", description: "",
+        rationale: "", source: "", verification: "", priority: "Muss" };
+      if (type === "nonfunctional") {
+        item.category = NFA_CATEGORIES[0];
+        item.metricScale = ""; item.metricMeter = "";
+        item.metricMust = ""; item.metricPlan = "";
+      }
       state[type].push(item);
       renderRequirementList(type);
       renderAcceptanceRelations();
@@ -286,11 +348,12 @@
       L.push("_Keine fachlichen Anforderungen erfasst._");
       L.push("");
     } else {
-      state.functional.forEach((r, i) => {
-        L.push(`### ${displayId("functional", i)}: ${orDash(r.title)}`);
+      state.functional.forEach((r) => {
+        L.push(`### ${displayId("functional", r)}: ${orDash(r.title)}`);
         L.push("");
         L.push("- **Priorität:** " + (r.priority || "Muss"));
         L.push("- **Beschreibung:** " + orDash(r.description));
+        pushOptional(L, r);
         L.push("");
       });
     }
@@ -302,12 +365,17 @@
       L.push("_Keine nicht-fachlichen Anforderungen erfasst._");
       L.push("");
     } else {
-      state.nonfunctional.forEach((r, i) => {
-        L.push(`### ${displayId("nonfunctional", i)}: ${orDash(r.title)}`);
+      state.nonfunctional.forEach((r) => {
+        L.push(`### ${displayId("nonfunctional", r)}: ${orDash(r.title)}`);
         L.push("");
         L.push("- **Kategorie:** " + (r.category || "Sonstiges"));
         L.push("- **Priorität:** " + (r.priority || "Muss"));
         L.push("- **Beschreibung:** " + orDash(r.description));
+        if (nonEmpty(r.metricScale)) L.push("- **Messgröße:** " + r.metricScale.trim());
+        if (nonEmpty(r.metricMeter)) L.push("- **Messverfahren:** " + r.metricMeter.trim());
+        if (nonEmpty(r.metricMust)) L.push("- **Muss-Wert:** " + r.metricMust.trim());
+        if (nonEmpty(r.metricPlan)) L.push("- **Ziel-Wert:** " + r.metricPlan.trim());
+        pushOptional(L, r);
         L.push("");
       });
     }
@@ -320,7 +388,7 @@
       L.push("");
     } else {
       state.acceptance.forEach((a, i) => {
-        L.push(`### ${displayId("acceptance", i)}: ${orDash(a.title)}`);
+        L.push(`### ${displayId("acceptance", a)}: ${orDash(a.title)}`);
         L.push("");
         const relLabel = relatedLabel(a.relatedTo);
         if (relLabel) L.push("- **Bezug:** " + relLabel);
@@ -354,13 +422,22 @@
       const idx = state[type].findIndex(r => r.id === relId);
       if (idx >= 0) {
         const r = state[type][idx];
-        out = displayId(type, idx) + (r.title ? " – " + r.title : "");
+        out = displayId(type, r) + (r.title ? " – " + r.title : "");
       }
     });
     return out;
   }
 
   function orDash(v) { return (v && v.trim()) ? v.trim() : "—"; }
+  function nonEmpty(v) { return !!(v && v.trim()); }
+
+  // Begründung, Quelle und Nachweisart nur ausgeben, wenn gepflegt.
+  // So bleiben Dateien aus älteren Ständen unverändert lesbar.
+  function pushOptional(L, r) {
+    if (nonEmpty(r.rationale)) L.push("- **Begründung:** " + r.rationale.trim().replace(/\n+/g, " "));
+    if (nonEmpty(r.source)) L.push("- **Quelle:** " + r.source.trim());
+    if (nonEmpty(r.verification)) L.push("- **Nachweis:** " + r.verification.trim());
+  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => (
       { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
@@ -425,16 +502,23 @@
       const h3 = line.match(/^###\s+(.*)$/);
       if (h3) {
         item = null;
+        // Nummer aus der Überschrift übernehmen, damit Bezeichner erhalten bleiben
+        const marker = h3[1].match(/^(FA|NFA|AK)-(\d+)\s*:\s*/i);
+        const num = marker ? parseInt(marker[2], 10) : null;
         if (section === "functional" || section === "nonfunctional") {
-          item = { id: nextId(section), title: "", description: "", priority: "Muss" };
-          if (section === "nonfunctional") item.category = NFA_CATEGORIES[0];
+          item = { id: newId(), num: num, title: "", description: "",
+            rationale: "", source: "", verification: "", priority: "Muss" };
+          if (section === "nonfunctional") {
+            item.category = NFA_CATEGORIES[0];
+            item.metricScale = ""; item.metricMeter = "";
+            item.metricMust = ""; item.metricPlan = "";
+          }
           st[section].push(item);
         } else if (section === "acceptance") {
-          item = { id: nextId("acceptance"), title: "", relatedTo: "", given: "", when: "", then: "" };
+          item = { id: newId(), num: num, title: "", relatedTo: "", given: "", when: "", then: "" };
           st.acceptance.push(item);
         }
         if (item) {
-          // Führende Nummerierung (FA-1:, NFA-2:, AK-3:) entfernen
           item.title = clean(h3[1].replace(/^(FA|NFA|AK)-\d+\s*:\s*/i, ""));
         }
         continue;
@@ -443,17 +527,31 @@
       // Feldzeilen einer Anforderung
       const bullet = line.match(/^\s*[-*]\s+\*\*(.+?):\*\*\s*(.*)$/);
       if (bullet && item) {
-        const key = bullet[1].trim().toLowerCase();
+        const key = normalizeKey(bullet[1]);
         const val = clean(bullet[2]);
-        if (key.startsWith("priorit")) {
+        if (key.startsWith("prior")) {
           item.priority = ["Muss", "Soll", "Kann"].includes(val) ? val : "Muss";
-        } else if (key.startsWith("beschreibung")) {
+        } else if (key.startsWith("beschr")) {
           item.description = val;
-        } else if (key.startsWith("kategorie")) {
+        } else if (key.startsWith("kateg")) {
           item.category = NFA_CATEGORIES.includes(val) ? val : "Sonstiges";
+        } else if (key.startsWith("begr")) {
+          item.rationale = val;
+        } else if (key.startsWith("quelle")) {
+          item.source = val;
+        } else if (key.startsWith("nachweis") || key.startsWith("verif")) {
+          item.verification = VERIFICATION_METHODS.includes(val) ? val : "";
+        } else if (key.startsWith("messverf")) {
+          item.metricMeter = val;
+        } else if (key.startsWith("messgr")) {
+          item.metricScale = val;
+        } else if (key.startsWith("muss")) {
+          item.metricMust = val;
+        } else if (key.startsWith("ziel")) {
+          item.metricPlan = val;
         } else if (key.startsWith("bezug")) {
           const ref = val.match(/^(FA|NFA)-(\d+)/i);
-          if (ref) relations.push({ item, type: ref[1].toUpperCase(), index: parseInt(ref[2], 10) - 1 });
+          if (ref) relations.push({ item, type: ref[1].toUpperCase(), num: parseInt(ref[2], 10) });
         } else if (key.startsWith("gegeben")) {
           item.given = val;
         } else if (key.startsWith("wenn")) {
@@ -478,18 +576,30 @@
     }
     flushText();
 
-    // Bezüge der Abnahmekriterien auflösen (FA-1 → tatsächliche ID)
-    relations.forEach(({ item, type, index }) => {
-      const list = type === "FA" ? st.functional : st.nonfunctional;
-      if (list[index]) item.relatedTo = list[index].id;
+    // Einträge ohne Nummer in der Datei fortlaufend nachnummerieren
+    ["functional", "nonfunctional", "acceptance"].forEach(type => {
+      let max = 0;
+      st[type].forEach(it => { if (it.num > max) max = it.num; });
+      st[type].forEach(it => { if (!it.num) it.num = ++max; });
+      st.counters[type] = max;
     });
 
-    st.counters = {
-      functional: st.functional.length,
-      nonfunctional: st.nonfunctional.length,
-      acceptance: st.acceptance.length
-    };
+    // Bezüge der Abnahmekriterien auflösen (FA-3 → tatsächliche ID)
+    relations.forEach(({ item, type, num }) => {
+      const list = type === "FA" ? st.functional : st.nonfunctional;
+      const target = list.find(r => r.num === num);
+      if (target) item.relatedTo = target.id;
+    });
+
     return st;
+  }
+
+  // Vereinheitlicht Feldnamen: Kleinschreibung ohne Umlaute, damit
+  // "Messgröße", "Messgroesse" und "MESSGROSSE" gleich behandelt werden.
+  function normalizeKey(s) {
+    return String(s).trim().toLowerCase()
+      .replace(/[äöü]/g, m => ({ "ä": "a", "ö": "o", "ü": "u" }[m]))
+      .replace(/ß/g, "ss");
   }
 
   function hasContent(s) {
@@ -678,7 +788,7 @@
       reader.onload = () => {
         try {
           const parsed = JSON.parse(reader.result);
-          state = Object.assign(defaultState(), parsed);
+          state = migrate(Object.assign(defaultState(), parsed));
           renderAll();
           save();
           toast("Projekt importiert");

@@ -8,9 +8,11 @@ kann, um die Umsetzung zu starten.
 ## Funktionen
 
 - **Projektübersicht** – Titel, Autor, Zielsetzung, Technologie-Rahmen, Out of Scope
-- **Fachliche Anforderungen** (funktional) – mit Kurztitel, Beschreibung und Priorität (Muss/Soll/Kann)
+- **Fachliche Anforderungen** (funktional) – Kurztitel, Beschreibung, Priorität
+  (Muss/Soll/Kann), **Begründung**, **Quelle** und **Nachweisart**
 - **Nicht-fachliche Anforderungen** (nicht-funktional) – zusätzlich mit Kategorie
-  (Performance, Sicherheit, Usability, Datenschutz, Betrieb …)
+  (Performance, Sicherheit, Usability, Datenschutz, Betrieb …) sowie
+  **Messgröße, Messverfahren, Muss-Wert und Ziel-Wert**
 - **Abnahmekriterien** – optional im Gegeben/Wenn/Dann-Format, mit Zuordnung zu einer Anforderung
 - **Live-Markdown-Vorschau** rechts, jederzeit aktuell
 - **Download `.md`** und **Kopieren** in die Zwischenablage
@@ -34,6 +36,21 @@ Es wird **kein Server und keine Installation** benötigt – alles läuft lokal 
 > **Hinweis:** Wird die Anwendung in einer eingebetteten Vorschau (iframe) angezeigt,
 > blockiert der Browser Datei-Downloads. In diesem Fall öffnet sich automatisch ein
 > Dialog mit dem fertigen Markdown-Text samt **Alles kopieren**-Schaltfläche.
+
+## Orientierung an Normen
+
+Die Felder folgen etablierten Vorgaben der Anforderungsanalyse:
+
+| Feld | Hintergrund |
+|------|-------------|
+| Begründung | INCOSE-Attribut *Rationale* – belegt, dass eine Anforderung notwendig ist |
+| Quelle / Anfordernder | INCOSE *Trace to Source* – ermöglicht Rückfragen und Konfliktauflösung |
+| Nachweis durch (Test, Analyse, Inspektion, Demonstration) | ISO/IEC/IEEE 29148 – Merkmal *verifizierbar* |
+| Messgröße, Messverfahren, Muss-/Ziel-Wert | Planguage (Gilb) – macht nicht-funktionale Anforderungen prüfbar |
+| Stabile Bezeichner (FA-3 bleibt FA-3) | Nummern werden nie erneut vergeben, damit externe Verweise gültig bleiben |
+
+Alle neuen Felder sind optional. Ältere Dateien und Sicherungen bleiben lesbar;
+leere Felder erscheinen nicht in der Markdown-Ausgabe.
 
 ## Bestehende Anforderungen weiterbearbeiten
 

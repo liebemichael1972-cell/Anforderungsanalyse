@@ -155,6 +155,25 @@ select { cursor: pointer; }
 .category-field { display: none; }
 .category-field.show { display: flex; }
 
+/* Begründung / Quelle */
+.req-extra { margin-top: 10px; }
+.req-extra .field { margin-bottom: 0; }
+
+/* Messwerte – nur bei nicht-fachlichen Anforderungen */
+.metrics-field { display: none; }
+.metrics-field.show {
+  display: block;
+  margin-top: 11px;
+  padding: 11px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.metrics-hint { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+.metrics-field .grid-2 { margin-bottom: 10px; }
+.metrics-field .grid-2:last-child { margin-bottom: 0; }
+.metrics-field .field { margin-bottom: 0; }
+
 .gwt { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
 @media (max-width: 700px) { .gwt { grid-template-columns: 1fr; } }
 .gwt .field { margin-bottom: 0; }
