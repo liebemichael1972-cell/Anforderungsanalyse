@@ -203,3 +203,28 @@ select { cursor: pointer; }
   z-index: 100;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Fallback-Dialog, wenn der Browser keinen Download zulässt */
+.overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(10,12,20,.55);
+  display: grid; place-items: center; padding: 20px;
+}
+.modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  width: min(640px, 100%); max-height: 88vh;
+  display: flex; flex-direction: column; padding: 20px 22px;
+}
+.modal h3 { margin: 0 0 6px; font-size: 16px; }
+.modal-hint { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+.modal-hint code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--card-2); padding: 1px 5px; border-radius: 4px; font-size: 12px;
+}
+.modal textarea {
+  flex: 1; min-height: 240px; resize: none;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.6;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; }
