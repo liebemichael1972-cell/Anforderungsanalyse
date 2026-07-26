@@ -29,6 +29,10 @@ Es wird **kein Server und keine Installation** benötigt – alles läuft lokal 
 2. Projektangaben und Anforderungen erfassen.
 3. Rechts **Download .md** klicken – die Markdown-Datei wird gespeichert.
 
+> **Hinweis:** Wird die Anwendung in einer eingebetteten Vorschau (iframe) angezeigt,
+> blockiert der Browser Datei-Downloads. In diesem Fall öffnet sich automatisch ein
+> Dialog mit dem fertigen Markdown-Text samt **Alles kopieren**-Schaltfläche.
+
 ## Weitergabe an Claude Code
 
 Die erzeugte Markdown-Datei (z. B. `mein-projekt-anforderungen.md`) ins Projekt legen

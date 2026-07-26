@@ -379,14 +379,93 @@
       .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "anforderungen";
   }
 
+  // Läuft die Anwendung eingebettet (iframe)? Dort können Browser Downloads sperren.
+  function isEmbedded() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
+  // Löst den Datei-Download aus. Der Download wird immer angestoßen; die
+  // Kopier-Möglichkeit wird nur zusätzlich angeboten, falls der Browser ihn sperrt.
   function downloadBlob(content, filename, mime) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
+    a.href = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    // Eingebettete Ansichten können Downloads sperren – dort zusätzlich einen
+    // Ausweg anbieten, ohne den regulären Download zu behindern.
+    if (isEmbedded()) offerCopyFallback(content, filename, url);
+
+
+    // URL erst spät freigeben, damit langsame Downloads nicht abbrechen.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return true;
+  }
+
+  // Unaufdringlicher Hinweis: Falls der Download nicht ankam, Inhalt kopieren.
+  function offerCopyFallback(content, filename, url) {
+    let bar = document.querySelector(".fallback-bar");
+    if (bar) bar.remove();
+    bar = document.createElement("div");
+    bar.className = "fallback-bar";
+    bar.innerHTML = `<span>Download gestartet. Nichts angekommen?</span>
+      <button class="btn" data-tab>In neuem Tab öffnen</button>
+      <button class="btn btn-primary" data-open>Inhalt kopieren</button>
+      <button class="icon-btn" data-close aria-label="Hinweis schließen">✕</button>`;
+    document.body.appendChild(bar);
+    requestAnimationFrame(() => bar.classList.add("show"));
+
+    const close = () => bar.remove();
+    bar.querySelector("[data-close]").addEventListener("click", close);
+    // Öffnen aus einer Nutzeraktion heraus – das lassen Browser eher zu.
+    bar.querySelector("[data-tab]").addEventListener("click", () => {
+      window.open(url, "_blank", "noopener");
+    });
+    bar.querySelector("[data-open]").addEventListener("click", () => {
+      close(); showTextFallback(content, filename);
+    });
+    setTimeout(() => { if (bar.isConnected) bar.classList.remove("show"); }, 12000);
+    setTimeout(() => { if (bar.isConnected) bar.remove(); }, 12400);
+  }
+
+  function showTextFallback(content, filename) {
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+        <h3 id="dlgTitle">Inhalt kopieren</h3>
+        <p class="modal-hint">Kopiere den Text und speichere ihn als <code></code>.</p>
+        <textarea readonly spellcheck="false"></textarea>
+        <div class="modal-actions">
+          <button class="btn" data-close>Schließen</button>
+          <button class="btn btn-primary" data-copy>Alles kopieren</button>
+        </div>
+      </div>`;
+    overlay.querySelector("code").textContent = filename;
+    const ta = overlay.querySelector("textarea");
+    ta.value = content;
+    document.body.appendChild(overlay);
+    ta.focus(); ta.select();
+
+    const close = () => overlay.remove();
+    overlay.querySelector("[data-close]").addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    document.addEventListener("keydown", function esc(e) {
+      if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
+    });
+    overlay.querySelector("[data-copy]").addEventListener("click", async () => {
+      ta.select();
+      try { await navigator.clipboard.writeText(content); }
+      catch (e) { document.execCommand("copy"); }
+      toast("Kopiert – jetzt einfügen und speichern");
+      close();
+    });
   }
 
   function toast(msg) {
